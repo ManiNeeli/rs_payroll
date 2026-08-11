@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Apply for Leave</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <h1>Apply for Leave</h1>
+  <p><a href="dashboard.html">← Back to Dashboard</a></p>
+
+  <form id="leaveForm">
+    <select id="leaveType" required></select><br><br>
+    <label>From: <input type="date" id="startDate" required></label><br><br>
+    <label>To: <input type="date" id="endDate" required></label><br><br>
+    <textarea id="reason" placeholder="Reason"></textarea><br><br>
+    <button type="submit">Submit Request</button>
+  </form>
+
+  <p id="msg"></p>
+
+  <h3>My Leave Requests</h3>
+  <table border="1" cellpadding="6">
+    <thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead>
+    <tbody id="requestsBody"></tbody>
+  </table>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabaseClient.js"></script>
+  <script src="../js/guards.js"></script>
+  <script>
+    let userId = null;
+
+    async function init() {
+      await guardRole('employee');
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      userId = session.user.id;
+      await loadLeaveTypes();
+      await loadMyRequests();
+    }
+
+    async function loadLeaveTypes() {
+      const { data } = await supabaseClient.from('leave_types').select('*');
+      const sel = document.getElementById('leaveType');
+      sel.innerHTML = '';
+      (data || []).forEach(t => {
+        sel.innerHTML += `<option value="${t.id}">${t.name}</option>`;
+      });
+    }
+
+    async function loadMyRequests() {
+      const { data } = await supabaseClient
+        .from('leave_requests')
+        .select('*, leave_types(name)')
+        .eq('employee_id', userId)
+        .order('created_at', { ascending: false });
+
+      const tbody = document.getElementById('requestsBody');
+      tbody.innerHTML = '';
+      (data || []).forEach(r => {
+        tbody.innerHTML += `<tr>
+          <td>${r.leave_types?.name || '-'}</td>
+          <td>${r.start_date}</td>
+          <td>${r.end_date}</td>
+          <td>${r.days}</td>
+          <td>${r.status}</td>
+        </tr>`;
+      });
+    }
+
+    document.getElementById('leaveForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+      const days = (new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24) + 1;
+
+      if (days < 1) {
+        document.getElementById('msg').textContent = 'End date must be on or after the start date.';
+        return;
+      }
+
+      const { error } = await supabaseClient.from('leave_requests').insert({
+        employee_id: userId,
+        leave_type_id: document.getElementById('leaveType').value,
+        start_date: startDate,
+        end_date: endDate,
+        days: days,
+        reason: document.getElementById('reason').value
+      });
+
+      document.getElementById('msg').textContent = error ? error.message : 'Request submitted!';
+      await loadMyRequests();
+    });
+    
+
+    init();
+  </script>
+</body>
+</html>

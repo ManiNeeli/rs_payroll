@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Employee Dashboard</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-role="employee">
+
+  <div id="cards">
+    <div>Leave Balance: <span id="leaveBalance">Loading...</span></div>
+    <div>This Month's Net Pay: <span id="netPay">Loading...</span></div>
+    <div>Attendance %: <span id="attendancePct">Loading...</span></div>
+  </div>
+
+  <p><a href="my-profile.html">My Profile</a></p>
+  <p><a href="my-attendance.html">My Attendance</a></p>
+  <p><a href="apply-leave.html">Apply for Leave</a></p>
+  <p><a href="my-payslips.html">My Payslips</a></p>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabaseClient.js"></script>
+  <script src="../js/guards.js"></script>
+  <script>
+    async function loadDashboard() {
+      await guardRole('employee');
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      const userId = session.user.id;
+      const now = new Date();
+
+      // Leave balance (sum across all leave types for current year)
+      const { data: balances } = await supabaseClient
+        .from('leave_balances')
+        .select('allocated, used')
+        .eq('employee_id', userId)
+        .eq('year', now.getFullYear());
+
+      const totalAllocated = (balances || []).reduce((s, b) => s + b.allocated, 0);
+      const totalUsed = (balances || []).reduce((s, b) => s + b.used, 0);
+      document.getElementById('leaveBalance').textContent = `${totalAllocated - totalUsed} days remaining`;
+
+      // Latest approved payslip
+      const { data: payslips } = await supabaseClient
+        .from('payslips')
+        .select('net_pay, payroll_runs(status, month, year)')
+        .eq('employee_id', userId)
+        .order('generated_at', { ascending: false });
+
+      const latestApproved = (payslips || []).find(p => p.payroll_runs?.status === 'approved' || p.payroll_runs?.status === 'paid');
+      document.getElementById('netPay').textContent = latestApproved ? `₹${latestApproved.net_pay}` : 'No approved payslip yet';
+
+      // Attendance % this month
+      const { data: attendance } = await supabaseClient
+        .from('attendance')
+        .select('status')
+        .eq('employee_id', userId)
+        .gte('date', `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`);
+
+      const presentCount = (attendance || []).filter(a => a.status === 'present').length;
+      const totalRecorded = (attendance || []).length;
+      document.getElementById('attendancePct').textContent = totalRecorded > 0
+        ? `${Math.round((presentCount / totalRecorded) * 100)}%`
+        : 'No data yet';
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

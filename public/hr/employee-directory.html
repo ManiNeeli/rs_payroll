@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Employee Directory</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-role="hr">
+
+  <h1>Employee Directory</h1>
+
+  <input type="text" id="searchBox" placeholder="Search by name or designation..." style="max-width:320px; margin-bottom:16px;" />
+
+  <table border="1" cellpadding="6">
+    <thead>
+      <tr>
+        <th>Name</th><th>Employee ID</th><th>Designation</th><th>Date of Joining</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="directoryBody"></tbody>
+  </table>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabaseClient.js"></script>
+  <script src="../js/guards.js"></script>
+  <script>
+    let allEmployees = [];
+
+    async function loadDirectory() {
+      await guardRole('hr');
+
+      const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('full_name, employee_id, designation, date_of_joining, status, role')
+        .in('role', ['employee', 'hr'])
+        .order('full_name');
+
+      if (error) {
+        document.getElementById('directoryBody').innerHTML = `<tr><td colspan="5">${error.message}</td></tr>`;
+        return;
+      }
+
+      allEmployees = data || [];
+      renderTable(allEmployees);
+    }
+
+    function renderTable(list) {
+      const tbody = document.getElementById('directoryBody');
+      tbody.innerHTML = '';
+      list.forEach(e => {
+        tbody.innerHTML += `<tr>
+          <td>${e.full_name}</td>
+          <td>${e.employee_id || '-'}</td>
+          <td>${e.designation || '-'}</td>
+          <td>${e.date_of_joining || '-'}</td>
+          <td>${e.status || '-'}</td>
+        </tr>`;
+      });
+    }
+
+    document.getElementById('searchBox').addEventListener('input', (e) => {
+      const term = e.target.value.toLowerCase();
+      const filtered = allEmployees.filter(emp =>
+        emp.full_name.toLowerCase().includes(term) ||
+        (emp.designation || '').toLowerCase().includes(term)
+      );
+      renderTable(filtered);
+    });
+
+    loadDirectory();
+  </script>
+</body>
+</html>

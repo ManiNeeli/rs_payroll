@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Payslips</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <h1>My Payslips</h1>
+  <p><a href="dashboard.html">← Back to Dashboard</a></p>
+
+  <table border="1" cellpadding="6">
+    <thead><tr><th>Month/Year</th><th>Net Pay</th><th>Action</th></tr></thead>
+    <tbody id="listBody"></tbody>
+  </table>
+
+  <div id="detailView" style="display:none; margin-top:30px; border:2px solid #333; padding:20px; max-width:500px;">
+    <h2>Payslip Detail</h2>
+    <div id="detailContent"></div>
+    <button id="downloadBtn">Download as PDF</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabaseClient.js"></script>
+  <script src="../js/guards.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script>
+    let userId = null;
+    let currentSlip = null;
+
+    async function init() {
+      await guardRole('employee');
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      userId = session.user.id;
+      await loadPayslips();
+    }
+
+    async function loadPayslips() {
+      const { data, error } = await supabaseClient
+        .from('payslips')
+        .select('*, payroll_runs(month, year, status)')
+        .eq('employee_id', userId)
+        .order('generated_at', { ascending: false });
+
+      const tbody = document.getElementById('listBody');
+      tbody.innerHTML = '';
+
+      if (error) { tbody.innerHTML = `<tr><td colspan="3">${error.message}</td></tr>`; return; }
+
+      (data || []).forEach(slip => {
+        if (slip.payroll_runs?.status !== 'approved' && slip.payroll_runs?.status !== 'paid') return; // only show approved
+        tbody.innerHTML += `<tr>
+          <td>${slip.payroll_runs?.month}/${slip.payroll_runs?.year}</td>
+          <td>₹${slip.net_pay}</td>
+          <td><button onclick='viewSlip(${JSON.stringify(slip).replace(/'/g, "&apos;")})'>View</button></td>
+        </tr>`;
+      });
+    }
+
+    function viewSlip(slip) {
+      currentSlip = slip;
+      document.getElementById('detailView').style.display = 'block';
+      document.getElementById('detailContent').innerHTML = `
+        <p><strong>Period:</strong> ${slip.payroll_runs.month}/${slip.payroll_runs.year}</p>
+        <table border="1" cellpadding="6" width="100%">
+          <tr><th colspan="2">Earnings</th><th colspan="2">Deductions</th></tr>
+          <tr><td>Basic</td><td>₹${slip.basic}</td><td>PF</td><td>₹${slip.pf_employee}</td></tr>
+          <tr><td>HRA</td><td>₹${slip.hra}</td><td>ESI</td><td>₹${slip.esi_employee}</td></tr>
+          <tr><td>DA</td><td>₹${slip.da}</td><td>Professional Tax</td><td>₹${slip.professional_tax}</td></tr>
+          <tr><td>Allowances</td><td>₹${slip.allowances}</td><td>TDS</td><td>₹${slip.tds}</td></tr>
+          <tr><td>Bonus</td><td>₹${slip.bonus_total}</td><td>Other</td><td>₹${slip.other_deductions}</td></tr>
+          <tr><td><strong>Gross</strong></td><td><strong>₹${slip.gross_earnings}</strong></td><td colspan="2"></td></tr>
+        </table>
+        <h3>Net Pay: ₹${slip.net_pay}</h3>
+        <p>Days Present: ${slip.days_present} / ${slip.working_days} working days</p>
+      `;
+    }
+
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+  if (!currentSlip) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const navy = [19, 42, 76];
+  const gold = [200, 155, 74];
+
+  // Header band
+  doc.setFillColor(...navy);
+  doc.rect(0, 0, 210, 32, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('RS COMPANY', 15, 16);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...gold);
+  doc.text('Payroll & HR Department', 15, 23);
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12);
+  doc.text('PAYSLIP', 195, 16, { align: 'right' });
+  doc.setFontSize(9);
+  doc.text(`${currentSlip.payroll_runs.month}/${currentSlip.payroll_runs.year}`, 195, 23, { align: 'right' });
+
+  // Employee info
+  doc.setTextColor(30, 30, 30);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Employee', 15, 42);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Days Present: ${currentSlip.days_present} / ${currentSlip.working_days} working days`, 15, 48);
+
+  // Earnings & Deductions table
+  doc.autoTable({
+    startY: 56,
+    head: [['Earnings', 'Amount (₹)', 'Deductions', 'Amount (₹)']],
+    body: [
+      ['Basic', currentSlip.basic, 'Provident Fund', currentSlip.pf_employee],
+      ['HRA', currentSlip.hra, 'ESI', currentSlip.esi_employee],
+      ['DA', currentSlip.da, 'Professional Tax', currentSlip.professional_tax],
+      ['Allowances', currentSlip.allowances, 'TDS', currentSlip.tds],
+      ['Bonus', currentSlip.bonus_total, 'Other Deductions', currentSlip.other_deductions],
+    ],
+    headStyles: { fillColor: navy, textColor: 255, fontStyle: 'bold' },
+    styles: { fontSize: 9.5, cellPadding: 5 },
+    columnStyles: { 1: { halign: 'right' }, 3: { halign: 'right' } },
+  });
+
+  let finalY = doc.lastAutoTable.finalY + 8;
+
+  doc.autoTable({
+    startY: finalY,
+    body: [
+      ['Gross Earnings', currentSlip.gross_earnings],
+      ['Total Deductions', (
+        Number(currentSlip.pf_employee) + Number(currentSlip.esi_employee) +
+        Number(currentSlip.professional_tax) + Number(currentSlip.tds) +
+        Number(currentSlip.other_deductions)
+      ).toFixed(2)],
+    ],
+    styles: { fontSize: 9.5, cellPadding: 4 },
+    columnStyles: { 1: { halign: 'right' } },
+    theme: 'plain',
+  });
+
+  finalY = doc.lastAutoTable.finalY + 6;
+
+  doc.setFillColor(...gold);
+  doc.rect(15, finalY, 180, 14, 'F');
+  doc.setTextColor(...navy);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('NET PAY', 20, finalY + 9.5);
+  doc.text(`Rs. ${currentSlip.net_pay}`, 190, finalY + 9.5, { align: 'right' });
+
+  doc.setTextColor(150, 150, 150);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text('This is a system-generated payslip and does not require a signature.', 15, 285);
+
+  doc.save(`RSCompany_Payslip_${currentSlip.payroll_runs.month}_${currentSlip.payroll_runs.year}.pdf`);
+  });
+
+    init();
+  </script>
+</body>
+</html>

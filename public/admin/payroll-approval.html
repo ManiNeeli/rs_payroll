@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Payroll Approval</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <h1>Payroll Approval</h1>
+  <p><a href="dashboard.html">← Back to Dashboard</a></p>
+
+  <table border="1" cellpadding="6">
+    <thead><tr><th>Month/Year</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody id="runsBody"></tbody>
+  </table>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabaseClient.js"></script>
+  <script src="../js/guards.js"></script>
+  <script>
+    async function loadRuns() {
+      const { data } = await supabaseClient.from('payroll_runs').select('*').order('year', { ascending: false });
+      const tbody = document.getElementById('runsBody');
+      tbody.innerHTML = '';
+      (data || []).forEach(r => {
+        tbody.innerHTML += `<tr>
+          <td>${r.month}/${r.year}</td>
+          <td>${r.status}</td>
+          <td>${r.status === 'processing' ? `<button onclick="approveRun('${r.id}')">Approve</button>` : '-'}</td>
+        </tr>`;
+      });
+    }
+
+    async function approveRun(id) {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      await supabaseClient.from('payroll_runs')
+        .update({ status: 'approved', approved_by: session.user.id })
+        .eq('id', id);
+      loadRuns();
+    }
+
+    async function init() {
+      await guardRole('admin');
+      await loadRuns();
+    }
+    init();
+  </script>
+</body>
+</html>

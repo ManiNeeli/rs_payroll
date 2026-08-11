@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HR Dashboard</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-role="hr">
+
+  <div id="cards">
+    <div>Pending Leave Approvals: <span id="pendingLeaves">Loading...</span></div>
+    <div>Present Today: <span id="presentToday">Loading...</span></div>
+    <div>Latest Payroll Run: <span id="payrollStatus">Loading...</span></div>
+  </div>
+
+  <p><a href="employee-directory.html">Employee Directory</a></p>
+  <p><a href="attendance-management.html">Attendance Management</a></p>
+  <p><a href="leave-approvals.html">Leave Approvals</a></p>
+  <p><a href="salary-structure.html">Salary Structure</a></p>
+  <p><a href="run-payroll.html">Run Payroll</a></p>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabaseClient.js"></script>
+  <script src="../js/guards.js"></script>
+  <script>
+    async function loadDashboard() {
+      await guardRole('hr');
+      const today = new Date().toISOString().split('T')[0];
+
+      const { count: pendingCount } = await supabaseClient
+        .from('leave_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      document.getElementById('pendingLeaves').textContent = pendingCount ?? 0;
+
+      const { count: presentCount } = await supabaseClient
+        .from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .eq('date', today)
+        .eq('status', 'present');
+      document.getElementById('presentToday').textContent = presentCount ?? 0;
+
+      const { data: runs } = await supabaseClient
+        .from('payroll_runs')
+        .select('month, year, status')
+        .order('year', { ascending: false })
+        .order('month', { ascending: false })
+        .limit(1);
+
+      document.getElementById('payrollStatus').textContent = runs && runs.length
+        ? `${runs[0].month}/${runs[0].year} — ${runs[0].status}`
+        : 'No runs yet';
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

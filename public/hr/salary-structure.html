@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Salary Structure</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <h1>Set Salary Structure</h1>
+  <p><a href="dashboard.html">← Back to Dashboard</a></p>
+
+  <select id="employeeSelect"></select><br><br>
+
+  <form id="salaryForm">
+    <label>Effective From: <input type="date" id="effectiveFrom" required></label><br><br>
+    <label>Basic: <input type="number" id="basic" required></label><br><br>
+    <label>HRA: <input type="number" id="hra" required></label><br><br>
+    <label>DA: <input type="number" id="da" value="0"></label><br><br>
+    <label>Conveyance: <input type="number" id="conveyance" value="0"></label><br><br>
+    <label>Medical Allowance: <input type="number" id="medical" value="0"></label><br><br>
+    <label>Special Allowance: <input type="number" id="special" value="0"></label><br><br>
+    <label>Other Allowances: <input type="number" id="other" value="0"></label><br><br>
+    <label>Annual CTC: <input type="number" id="ctc" required></label><br><br>
+    <label>PF Applicable: <input type="checkbox" id="pfApplicable" checked></label><br><br>
+    <label>ESI Applicable: <input type="checkbox" id="esiApplicable"></label><br><br>
+    <label>Tax Regime:
+      <select id="taxRegime">
+        <option value="new">New</option>
+        <option value="old">Old</option>
+      </select>
+    </label><br><br>
+    <button type="submit">Save Salary Structure</button>
+  </form>
+
+  <p id="msg"></p>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabaseClient.js"></script>
+  <script src="../js/guards.js"></script>
+  <script>
+    async function loadEmployees() {
+      const { data } = await supabaseClient
+        .from('profiles')
+        .select('id, full_name, employee_id')
+        .in('role', ['employee', 'hr']);
+
+      const sel = document.getElementById('employeeSelect');
+      sel.innerHTML = '';
+      (data || []).forEach(e => {
+        sel.innerHTML += `<option value="${e.id}">${e.full_name} (${e.employee_id || 'no ID'})</option>`;
+      });
+    }
+
+    document.getElementById('salaryForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const { error } = await supabaseClient.from('salary_structures').insert({
+        employee_id: document.getElementById('employeeSelect').value,
+        effective_from: document.getElementById('effectiveFrom').value,
+        basic: +document.getElementById('basic').value,
+        hra: +document.getElementById('hra').value,
+        da: +document.getElementById('da').value,
+        conveyance: +document.getElementById('conveyance').value,
+        medical_allowance: +document.getElementById('medical').value,
+        special_allowance: +document.getElementById('special').value,
+        other_allowances: +document.getElementById('other').value,
+        ctc_annual: +document.getElementById('ctc').value,
+        pf_applicable: document.getElementById('pfApplicable').checked,
+        esi_applicable: document.getElementById('esiApplicable').checked,
+        tax_regime: document.getElementById('taxRegime').value
+      });
+
+      document.getElementById('msg').textContent = error ? error.message : 'Salary structure saved!';
+    });
+
+    async function init() {
+      await guardRole('hr');
+      await loadEmployees();
+    }
+    init();
+  </script>
+</body>
+</html>

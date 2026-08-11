@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-role="admin">
+
+  <div id="cards">
+    <div>Total Headcount: <span id="headcount">Loading...</span></div>
+    <div>Departments: <span id="deptCount">Loading...</span></div>
+  </div>
+
+  <canvas id="payrollChart" width="500" height="250"></canvas>
+
+  <p><a href="manage-employees.html">+ Create HR / Employee Account</a></p>
+  <p><a href="payroll-approval.html">Payroll Approval</a></p>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabaseClient.js"></script>
+  <script src="../js/guards.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    async function loadDashboard() {
+      await guardRole('admin');
+
+      const { count: headcount } = await supabaseClient
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
+      document.getElementById('headcount').textContent = headcount ?? 0;
+
+      const { count: deptCount } = await supabaseClient
+        .from('departments')
+        .select('*', { count: 'exact', head: true });
+      document.getElementById('deptCount').textContent = deptCount ?? 0;
+
+      // Payroll cost trend: sum net_pay per run
+      const { data: runs } = await supabaseClient
+        .from('payroll_runs')
+        .select('id, month, year')
+        .order('year')
+        .order('month');
+
+      const labels = [];
+      const totals = [];
+
+      for (const run of (runs || [])) {
+        const { data: slips } = await supabaseClient
+          .from('payslips')
+          .select('net_pay')
+          .eq('payroll_run_id', run.id);
+        const total = (slips || []).reduce((s, x) => s + Number(x.net_pay), 0);
+        labels.push(`${run.month}/${run.year}`);
+        totals.push(total);
+      }
+
+      new Chart(document.getElementById('payrollChart'), {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{ label: 'Total Payroll Cost (₹)', data: totals, backgroundColor: '#4f46e5' }]
+        }
+      });
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

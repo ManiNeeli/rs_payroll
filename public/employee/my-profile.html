@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Profile</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-role="employee">
+
+  <h1>My Profile</h1>
+
+  <div id="cards">
+    <div>Employee ID: <span id="empId">Loading...</span></div>
+    <div>Department: <span id="dept">Loading...</span></div>
+    <div>Date of Joining: <span id="doj">Loading...</span></div>
+  </div>
+
+  <table border="1" cellpadding="6">
+    <tbody>
+      <tr><th>Full Name</th><td id="fullName">-</td></tr>
+      <tr><th>Email</th><td id="email">-</td></tr>
+      <tr><th>Phone</th><td id="phone">-</td></tr>
+      <tr><th>Designation</th><td id="designation">-</td></tr>
+      <tr><th>Status</th><td id="status">-</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Update Contact Info</h3>
+  <form id="updateForm">
+    <label>Phone Number</label>
+    <input type="text" id="phoneInput" placeholder="Phone number" />
+    <button type="submit">Save</button>
+  </form>
+
+  <p id="msg"></p>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabaseClient.js"></script>
+  <script src="../js/guards.js"></script>
+  <script>
+    let userId = null;
+
+    async function init() {
+      await guardRole('employee');
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      userId = session.user.id;
+
+      const { data: profile, error } = await supabaseClient
+        .from('profiles')
+        .select('*, departments(name)')
+        .eq('id', userId)
+        .single();
+
+      if (error || !profile) {
+        document.getElementById('msg').textContent = 'Could not load profile.';
+        return;
+      }
+
+      document.getElementById('empId').textContent = profile.employee_id || '-';
+      document.getElementById('dept').textContent = profile.departments?.name || '-';
+      document.getElementById('doj').textContent = profile.date_of_joining || '-';
+
+      document.getElementById('fullName').textContent = profile.full_name || '-';
+      document.getElementById('email').textContent = session.user.email || '-';
+      document.getElementById('phone').textContent = profile.phone || '-';
+      document.getElementById('designation').textContent = profile.designation || '-';
+      document.getElementById('status').textContent = profile.status || '-';
+
+      document.getElementById('phoneInput').value = profile.phone || '';
+    }
+
+    document.getElementById('updateForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const newPhone = document.getElementById('phoneInput').value;
+
+      const { error } = await supabaseClient
+        .from('profiles')
+        .update({ phone: newPhone })
+        .eq('id', userId);
+
+      const msg = document.getElementById('msg');
+      if (error) {
+        msg.textContent = error.message;
+      } else {
+        msg.textContent = 'Phone number updated!';
+        document.getElementById('phone').textContent = newPhone;
+      }
+    });
+
+    init();
+  </script>
+</body>
+</html>

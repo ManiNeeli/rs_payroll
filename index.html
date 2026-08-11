@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>RS Company — Payroll & HR</title>
+  <link rel="stylesheet" href="public/assets/css/style.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <img src="public/assets/img/rs-logo.png" alt="Decorative RS Solutions company logo featuring stylized lowercase rs lettering inside a circular emblem with sweeping flourishes. The text reads RS SOLUTION and INNOVATIVE DEVELOPMENT PARTNER on a transparent background, conveying a polished professional tone." />
+      <h1>RS Solutions</h1>
+      <p class="tagline">Payroll & HR Portal</p>
+
+      <form id="loginForm">
+        <label>Email</label>
+        <input type="email" id="email" placeholder="you@rscompany.com" required />
+        <label>Password</label>
+        <input type="password" id="password" placeholder="••••••••" required />
+        <button type="submit">Sign in</button>
+      </form>
+
+      <p id="errorMsg" style="color:#C0362C;"></p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="public/js/supabaseClient.js"></script>
+  <script src="public/js/auth.js"></script>
+</body>
+</html>

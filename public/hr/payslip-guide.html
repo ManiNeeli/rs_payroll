@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Payslip Guide</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body data-role="hr">
+
+  <h1>How to Create an Employee Payslip</h1>
+  <p>Follow these steps in order every month. Steps 1–2 only need to be redone when something changes (a new hire, a raise, etc.) — steps 3–5 repeat every payroll cycle.</p>
+
+  <h3>1. Make sure the employee has a Salary Structure</h3>
+  <p>Go to <a href="salary-structure.html">Salary Structure</a>. Select the employee, enter Basic, HRA, DA, and allowances, and save. Payroll cannot be calculated for anyone without this set.</p>
+
+  <h3>2. Make sure attendance is being recorded</h3>
+  <p>Check <a href="attendance-management.html">Attendance Management</a> for the month. Payroll pro-rates pay based on how many working days the employee was marked present or on approved leave — days with no record count as unpaid (LOP).</p>
+
+  <h3>3. Approve any pending leave</h3>
+  <p>Check <a href="leave-approvals.html">Leave Approvals</a>. Approved leave is automatically excluded from LOP — pending or rejected leave is not, so approve requests before running payroll.</p>
+
+  <h3>4. Run Payroll</h3>
+  <p>Go to <a href="run-payroll.html">Run Payroll</a>.</p>
+  <table border="1" cellpadding="6">
+    <tbody>
+      <tr><td><strong>a.</strong></td><td>Enter the Month and Year for this payroll cycle.</td></tr>
+      <tr><td><strong>b.</strong></td><td>Click <strong>Create Payroll Run</strong>. This sets up the run in "draft" status.</td></tr>
+      <tr><td><strong>c.</strong></td><td>Click <strong>Calculate All Employees</strong>. This runs the payroll engine for every employee and shows a preview table with gross pay, PF, TDS, and net pay.</td></tr>
+      <tr><td><strong>d.</strong></td><td>Review the numbers in the table. If anything looks wrong, fix the underlying Salary Structure or Attendance, then click Calculate All again — it will safely recalculate and overwrite the preview.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5. Wait for Admin approval</h3>
+  <p>Once calculated, the run status changes to "processing." An Admin must review and approve it under Payroll Approval before employees can see their payslips. You cannot approve your own payroll run as HR — this is intentional, for accountability.</p>
+
+  <h3>6. Employee sees the payslip</h3>
+  <p>Once approved, the employee can log in, go to My Payslips, view the breakdown, and download it as a branded PDF. Nothing further is needed from HR at this point.</p>
+
+  <h3>Troubleshooting</h3>
+  <table border="1" cellpadding="6">
+    <thead><tr><th>Problem</th><th>Likely Cause</th></tr></thead>
+    <tbody>
+      <tr><td>Employee "Skipped" during Calculate All</td><td>They don't have a Salary Structure yet — set one, then re-run.</td></tr>
+      <tr><td>Net pay looks too low</td><td>Check their attendance — unmarked days count as unpaid leave (LOP).</td></tr>
+      <tr><td>Employee can't see their payslip</td><td>The run hasn't been approved by Admin yet — check Payroll Approval status.</td></tr>
+    </tbody>
+  </table>
+
+</body>
+</html>

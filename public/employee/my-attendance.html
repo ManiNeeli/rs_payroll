@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Attendance</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <h1>My Attendance</h1>
+  <p><a href="dashboard.html">← Back to Dashboard</a></p>
+
+  <p>Today's status: <span id="todayStatus">Loading...</span></p>
+
+  <button id="checkInBtn">Check In</button>
+  <button id="checkOutBtn">Check Out</button>
+
+  <p id="msg"></p>
+
+  <h3>My Attendance History</h3>
+  <table border="1" cellpadding="6">
+    <thead>
+      <tr><th>Date</th><th>Check In</th><th>Check Out</th><th>Status</th></tr>
+    </thead>
+    <tbody id="historyBody"></tbody>
+  </table>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabaseClient.js"></script>
+  <script src="../js/guards.js"></script>
+  <script>
+    let currentUserId = null;
+
+    async function init() {
+      await guardRole('employee');
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      currentUserId = session.user.id;
+      await loadToday();
+      await loadHistory();
+    }
+
+    function todayDateStr() {
+      return new Date().toISOString().split('T')[0];
+    }
+
+    async function loadToday() {
+      const { data } = await supabaseClient
+        .from('attendance')
+        .select('*')
+        .eq('employee_id', currentUserId)
+        .eq('date', todayDateStr())
+        .maybeSingle();
+
+      const statusEl = document.getElementById('todayStatus');
+      if (!data) {
+        statusEl.textContent = 'Not checked in yet';
+      } else if (data.check_in && !data.check_out) {
+        statusEl.textContent = 'Checked in at ' + new Date(data.check_in).toLocaleTimeString();
+      } else if (data.check_in && data.check_out) {
+        statusEl.textContent = 'Completed for today';
+      }
+    }
+
+    async function loadHistory() {
+      const { data } = await supabaseClient
+        .from('attendance')
+        .select('*')
+        .eq('employee_id', currentUserId)
+        .order('date', { ascending: false })
+        .limit(30);
+
+      const tbody = document.getElementById('historyBody');
+      tbody.innerHTML = '';
+      (data || []).forEach(row => {
+        tbody.innerHTML += `<tr>
+          <td>${row.date}</td>
+          <td>${row.check_in ? new Date(row.check_in).toLocaleTimeString() : '-'}</td>
+          <td>${row.check_out ? new Date(row.check_out).toLocaleTimeString() : '-'}</td>
+          <td>${row.status || '-'}</td>
+        </tr>`;
+      });
+    }
+
+    document.getElementById('checkInBtn').addEventListener('click', async () => {
+      const { error } = await supabaseClient.from('attendance').upsert({
+        employee_id: currentUserId,
+        date: todayDateStr(),
+        check_in: new Date().toISOString(),
+        status: 'present'
+      }, { onConflict: 'employee_id,date' });
+
+      document.getElementById('msg').textContent = error ? error.message : 'Checked in!';
+      await loadToday();
+      await loadHistory();
+    });
+
+    document.getElementById('checkOutBtn').addEventListener('click', async () => {
+      const { data: existing } = await supabaseClient
+        .from('attendance')
+        .select('id, check_in')
+        .eq('employee_id', currentUserId)
+        .eq('date', todayDateStr())
+        .maybeSingle();
+
+      if (!existing || !existing.check_in) {
+        document.getElementById('msg').textContent = 'You need to check in before checking out.';
+        return;
+      }
+
+      const { error } = await supabaseClient
+        .from('attendance')
+        .update({ check_out: new Date().toISOString() })
+        .eq('employee_id', currentUserId)
+        .eq('date', todayDateStr());
+
+      document.getElementById('msg').textContent = error ? error.message : 'Checked out!';
+      await loadToday();
+      await loadHistory();
+    });
+
+    init();
+  </script>
+</body>
+</html>

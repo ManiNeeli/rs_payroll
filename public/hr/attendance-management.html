@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Attendance Management</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <h1>Attendance Management</h1>
+  <p><a href="dashboard.html">← Back to Dashboard</a></p>
+
+  <input type="date" id="filterDate" />
+  <button id="loadBtn">Load</button>
+
+  <table border="1" cellpadding="6">
+    <thead>
+      <tr><th>Employee</th><th>Check In</th><th>Check Out</th><th>Status</th><th>Correct</th></tr>
+    </thead>
+    <tbody id="attBody"></tbody>
+  </table>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabaseClient.js"></script>
+  <script src="../js/guards.js"></script>
+  <script>
+    document.getElementById('filterDate').valueAsDate = new Date();
+
+    async function loadAttendance() {
+      const date = document.getElementById('filterDate').value;
+
+      const { data, error } = await supabaseClient
+        .from('attendance')
+        .select('id, date, check_in, check_out, status, profiles!employee_id(full_name)')
+        .eq('date', date);
+
+      const tbody = document.getElementById('attBody');
+      tbody.innerHTML = '';
+
+      if (error) { tbody.innerHTML = `<tr><td colspan="5">${error.message}</td></tr>`; return; }
+
+      (data || []).forEach(row => {
+        tbody.innerHTML += `<tr>
+          <td>${row.profiles?.full_name || 'Unknown'}</td>
+          <td>${row.check_in ? new Date(row.check_in).toLocaleTimeString() : '-'}</td>
+          <td>${row.check_out ? new Date(row.check_out).toLocaleTimeString() : '-'}</td>
+          <td>${row.status || '-'}</td>
+          <td><button onclick="markPresent('${row.id}')">Mark Present</button></td>
+        </tr>`;
+      });
+    }
+
+    async function markPresent(id) {
+      await supabaseClient.from('attendance').update({ status: 'present' }).eq('id', id);
+      loadAttendance();
+    }
+
+    document.getElementById('loadBtn').addEventListener('click', loadAttendance);
+
+    async function init() {
+      await guardRole('hr');
+      await loadAttendance();
+    }
+    init();
+  </script>
+</body>
+</html>

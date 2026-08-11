@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Leave Approvals</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <h1>Leave Approvals</h1>
+  <p><a href="dashboard.html">← Back to Dashboard</a></p>
+
+  <table border="1" cellpadding="6">
+    <thead><tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody id="reqBody"></tbody>
+  </table>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabaseClient.js"></script>
+  <script src="../js/guards.js"></script>
+  <script>
+    async function loadRequests() {
+      const { data, error } = await supabaseClient
+        .from('leave_requests')
+        .select('*, profiles!leave_requests_employee_id_fkey(full_name), leave_types(name)')
+        .order('created_at', { ascending: false });
+
+      const tbody = document.getElementById('reqBody');
+      tbody.innerHTML = '';
+
+      if (error) { tbody.innerHTML = `<tr><td colspan="8">${error.message}</td></tr>`; return; }
+
+      (data || []).forEach(r => {
+        tbody.innerHTML += `<tr>
+          <td>${r.profiles?.full_name || '-'}</td>
+          <td>${r.leave_types?.name || '-'}</td>
+          <td>${r.start_date}</td>
+          <td>${r.end_date}</td>
+          <td>${r.days}</td>
+          <td>${r.reason || '-'}</td>
+          <td>${r.status}</td>
+          <td>
+            ${r.status === 'pending' ? `
+              <button onclick="updateStatus('${r.id}', 'approved')">Approve</button>
+              <button onclick="updateStatus('${r.id}', 'rejected')">Reject</button>
+            ` : '-'}
+          </td>
+        </tr>`;
+      });
+    }
+
+    async function updateStatus(id, status) {
+      const { error } = await supabaseClient.from('leave_requests').update({ status }).eq('id', id);
+      if (error) alert(error.message);
+      loadRequests();
+    }
+
+    async function init() {
+      await guardRole('hr');
+      await loadRequests();
+    }
+    init();
+  </script>
+</body>
+</html>

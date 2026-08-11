@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Run Payroll</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <h1>Run Payroll</h1>
+  <p><a href="dashboard.html">← Back to Dashboard</a></p>
+
+  <label>Month: <input type="number" id="month" min="1" max="12" value="9"></label>
+  <label>Year: <input type="number" id="year" value="2026"></label>
+  <button id="createRunBtn">Create Payroll Run</button>
+  <button id="calcAllBtn">Calculate All Employees</button>
+
+  <p id="msg"></p>
+
+  <table border="1" cellpadding="6">
+    <thead>
+      <tr><th>Employee</th><th>Gross</th><th>PF</th><th>TDS</th><th>Net Pay</th></tr>
+    </thead>
+    <tbody id="payslipBody"></tbody>
+  </table>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabaseClient.js"></script>
+  <script src="../js/guards.js"></script>
+  <script>
+    let currentRunId = null;
+    (async () => { await guardRole('hr'); })();
+
+    document.getElementById('createRunBtn').addEventListener('click', async () => {
+      const month = +document.getElementById('month').value;
+      const year = +document.getElementById('year').value;
+      const { data: { session } } = await supabaseClient.auth.getSession();
+
+      const { data, error } = await supabaseClient
+        .from('payroll_runs')
+        .upsert({ month, year, status: 'draft', run_by: session.user.id }, { onConflict: 'month,year' })
+        .select()
+        .single();
+
+      if (error) { document.getElementById('msg').textContent = error.message; return; }
+      currentRunId = data.id;
+      document.getElementById('msg').textContent = `Run created (ID: ${data.id})`;
+    });
+
+    document.getElementById('calcAllBtn').addEventListener('click', async () => {
+      if (!currentRunId) { alert('Create a payroll run first'); return; }
+
+      const month = +document.getElementById('month').value;
+      const year = +document.getElementById('year').value;
+
+      const { data: employees } = await supabaseClient
+        .from('profiles')
+        .select('id, full_name')
+        .in('role', ['employee', 'hr']);
+
+      const tbody = document.getElementById('payslipBody');
+      tbody.innerHTML = '';
+
+      for (const emp of employees) {
+        const { data: calc, error } = await supabaseClient
+          .rpc('calculate_payroll', { p_employee_id: emp.id, p_month: month, p_year: year });
+
+        if (error || !calc || calc.length === 0) {
+          tbody.innerHTML += `<tr><td>${emp.full_name}</td><td colspan="4">Skipped: ${error?.message || 'no salary structure'}</td></tr>`;
+          continue;
+        }
+
+        const c = calc[0];
+
+        await supabaseClient.from('payslips').upsert({
+          payroll_run_id: currentRunId,
+          employee_id: emp.id,
+          days_in_month: c.days_in_month,
+          working_days: c.working_days,
+          days_present: c.days_present,
+          lop_days: c.lop_days,
+          gross_earnings: c.gross_earnings,
+          basic: c.basic, hra: c.hra, da: c.da, allowances: c.allowances,
+          bonus_total: c.bonus_total,
+          pf_employee: c.pf_employee, pf_employer: c.pf_employer,
+          esi_employee: c.esi_employee, esi_employer: c.esi_employer,
+          professional_tax: c.professional_tax,
+          tds: c.tds,
+          other_deductions: c.other_deductions,
+          net_pay: c.net_pay
+        }, { onConflict: 'payroll_run_id,employee_id' });
+
+        tbody.innerHTML += `<tr>
+          <td>${emp.full_name}</td>
+          <td>${c.gross_earnings}</td>
+          <td>${c.pf_employee}</td>
+          <td>${c.tds}</td>
+          <td>${c.net_pay}</td>
+        </tr>`;
+      }
+
+      await supabaseClient.from('payroll_runs').update({ status: 'processing' }).eq('id', currentRunId);
+      document.getElementById('msg').textContent = 'Payroll calculated for all employees!';
+    });
+  </script>
+</body>
+</html>

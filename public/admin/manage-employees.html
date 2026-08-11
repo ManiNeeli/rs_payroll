@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Manage Employees</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+  <h1>Create HR / Employee Account</h1>
+  <p><a href="dashboard.html">← Back to Dashboard</a></p>
+
+  <form id="createUserForm">
+    <fieldset>
+      <legend>Account</legend>
+      <input type="text" id="fullName" placeholder="Full Name" required /><br><br>
+      <input type="email" id="email" placeholder="Email" required /><br><br>
+      <input type="password" id="password" placeholder="Temporary Password" required /><br><br>
+      <input type="text" id="employeeId" placeholder="Employee ID (e.g. @RS1250)" required pattern="^@RS\d{4,}$"
+        title="Format: @RS followed by at least 4 digits, e.g. @RS1250" /><br><br>
+
+      <select id="role" required>
+        <option value="">-- Select Role --</option>
+        <option value="hr">HR</option>
+        <option value="employee">Employee</option>
+      </select><br><br>
+
+      <select id="department" required>
+        <option value="">-- Select Department --</option>
+      </select><br><br>
+
+      <input type="text" id="designation" placeholder="Designation" /><br><br>
+      <input type="date" id="dateOfJoining" required /><br><br>
+    </fieldset>
+
+    <fieldset>
+      <legend>Starting Salary Structure</legend>
+      <p style="font-size:0.9em;color:#666;">
+        Required so the employee shows up correctly in payroll. HR can revise this later from
+        the Salary Structure page.
+      </p>
+      <label>Effective From: <input type="date" id="effectiveFrom" required></label><br><br>
+      <label>Basic: <input type="number" id="basic" min="0" required></label><br><br>
+      <label>HRA: <input type="number" id="hra" min="0" required></label><br><br>
+      <label>DA: <input type="number" id="da" min="0" value="0"></label><br><br>
+      <label>Conveyance: <input type="number" id="conveyance" min="0" value="0"></label><br><br>
+      <label>Medical Allowance: <input type="number" id="medical" min="0" value="0"></label><br><br>
+      <label>Special Allowance: <input type="number" id="special" min="0" value="0"></label><br><br>
+      <label>Other Allowances: <input type="number" id="other" min="0" value="0"></label><br><br>
+      <label>Annual CTC: <input type="number" id="ctc" min="0" required></label><br><br>
+      <label>PF Applicable: <input type="checkbox" id="pfApplicable" checked></label><br><br>
+      <label>ESI Applicable: <input type="checkbox" id="esiApplicable"></label><br><br>
+      <label>Tax Regime:
+        <select id="taxRegime">
+          <option value="new">New</option>
+          <option value="old">Old</option>
+        </select>
+      </label><br><br>
+    </fieldset>
+
+    <button type="submit">Create Account</button>
+  </form>
+
+  <p id="resultMsg"></p>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabaseClient.js"></script>
+  <script src="../js/guards.js"></script>
+  <script>
+    async function loadDepartments() {
+      const { data, error } = await supabaseClient.from('departments').select('id, name').order('name');
+      const sel = document.getElementById('department');
+      if (error) {
+        sel.innerHTML = '<option value="">Could not load departments</option>';
+        return;
+      }
+      sel.innerHTML = '<option value="">-- Select Department --</option>' +
+        (data || []).map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+    }
+
+    async function init() {
+      await guardRole('admin');
+      await loadDepartments();
+    }
+    init();
+
+    document.getElementById("createUserForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const resultMsg = document.getElementById("resultMsg");
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      resultMsg.style.color = "";
+      resultMsg.textContent = "Creating account...";
+
+      const { data: { session } } = await supabaseClient.auth.getSession();
+
+      const payload = {
+        full_name: document.getElementById("fullName").value,
+        email: document.getElementById("email").value,
+        password: document.getElementById("password").value,
+        role: document.getElementById("role").value,
+        employee_id: document.getElementById("employeeId").value.trim(),
+        department_id: document.getElementById("department").value,
+        designation: document.getElementById("designation").value,
+        date_of_joining: document.getElementById("dateOfJoining").value || null,
+        salary: {
+          effective_from: document.getElementById("effectiveFrom").value,
+          basic: +document.getElementById("basic").value,
+          hra: +document.getElementById("hra").value,
+          da: +document.getElementById("da").value,
+          conveyance: +document.getElementById("conveyance").value,
+          medical_allowance: +document.getElementById("medical").value,
+          special_allowance: +document.getElementById("special").value,
+          other_allowances: +document.getElementById("other").value,
+          ctc_annual: +document.getElementById("ctc").value,
+          pf_applicable: document.getElementById("pfApplicable").checked,
+          esi_applicable: document.getElementById("esiApplicable").checked,
+          tax_regime: document.getElementById("taxRegime").value,
+        },
+      };
+
+      try {
+        const res = await fetch(
+          "https://bzfgjogychlxcsawhsvv.supabase.co/functions/v1/create-employee",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(payload),
+          }
+        );
+
+        const result = await res.json();
+
+        if (!res.ok) {
+          resultMsg.textContent = "Error: " + result.error;
+          resultMsg.style.color = "red";
+        } else {
+          resultMsg.textContent = "Account created successfully with department and starting salary!";
+          resultMsg.style.color = "green";
+          document.getElementById("createUserForm").reset();
+        }
+      } catch (err) {
+        resultMsg.textContent = "Network error: " + err.message;
+        resultMsg.style.color = "red";
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
